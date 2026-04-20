@@ -1,5 +1,5 @@
 {
-  "name": "ximple",
+  "name": "no0ne-browser",
   "version": "1.0.0",
   "scripts": {
     "start": "node server.js"
