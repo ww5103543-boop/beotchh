@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   <!-- Google tag (gtag.js) -->
    <script async src="https://www.googletagmanager.com/gtag/js?id=G-28N2G1YP27"></script>
    <script>
       window.dataLayer = window.dataLayer || [];
@@ -20,13 +19,13 @@
    </script>
    <script>
       window.__baremuxConfig = {
-         workerUrl: '/lithium-js/bareworker.js',
-         transport: '/lithium-js/bareworker.js'
+         workerUrl: '/ximplesc/bareworker.js',
+         transport: '/ximplesc/bareworker.js'
       };
       self.__baremuxConfig = window.__baremuxConfig;
    </script>
-   <script src="./lithium-js/scram/scramjet.all.js"></script>
-   <script src="./lithium-js/scramjet-config.js"></script>
+   <script src="./ximplesc/scram/scramjet.all.js"></script>
+   <script src="./ximplesc/scramjet-config.js"></script>
    <script>
       const profile = JSON.parse(localStorage.getItem('noone_profile') || '{}');
       const username = profile.username || 'Guest';
@@ -1418,7 +1417,7 @@
    <div id="statusMsg" class="status-msg">Settings saved</div>
 
    <script type="module">
-      import { setTransport, setWisp, getProxied } from "./lithium-js/lithium.mjs";
+      import { setTransport, setWisp, getProxied } from "./ximplesc/ximple.mjs";
 
       setWisp("wss://wisp.mercurywork.shop/");
       setTransport("epoxy");
