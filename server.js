@@ -1,72 +1,108 @@
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const http = require("http");
+const https = require("https");
+const fs = require("fs");
+const path = require("path");
 
-const PORT = process.env.PORT || 5000;
-const HOST = '0.0.0.0';
-const ROOT = __dirname;
+const PORT = process.env.PORT || 3000;
+const HOST = "0.0.0.0";
 
 const mimeTypes = {
-  '.html': 'text/html',
-  '.js': 'application/javascript',
-  '.mjs': 'application/javascript',
-  '.css': 'text/css',
-  '.wasm': 'application/wasm',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.map': 'application/json',
+  ".html": "text/html",
+  ".js": "application/javascript",
+  ".mjs": "application/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".wasm": "application/wasm",
+  ".map": "application/json",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
 };
 
-const fileCache = new Map();
-
-function serveFile(filePath, res) {
-  if (fileCache.has(filePath)) {
-    const { data, contentType, cacheControl } = fileCache.get(filePath);
-    res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
-    res.end(data);
-    return;
-  }
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not found');
-      return;
+// Proxy function for movies
+function proxyMovie(targetUrl, req, res) {
+  const url = new URL(targetUrl);
+  const options = {
+    hostname: url.hostname,
+    port: url.port || 443,
+    path: url.pathname + url.search,
+    method: "GET",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Referer": "https://vidsrc.xyz/",
+      "Origin": "https://vidsrc.xyz"
     }
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-    const cacheControl = ext === '.html' ? 'no-cache' : 'public, max-age=3600';
-    fileCache.set(filePath, { data, contentType, cacheControl });
-    res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': cacheControl });
-    res.end(data);
+  };
+
+  const protocol = url.protocol === "https:" ? https : http;
+  const proxyReq = protocol.request(options, (proxyRes) => {
+    const headers = { ...proxyRes.headers };
+    delete headers["x-frame-options"];
+    delete headers["content-security-policy"];
+    headers["Access-Control-Allow-Origin"] = "*";
+
+    res.writeHead(proxyRes.statusCode, headers);
+    proxyRes.pipe(res);
   });
+
+  proxyReq.on("error", (err) => {
+    console.error("Proxy error:", err);
+    res.writeHead(500, { "Content-Type": "text/plain" });
+    res.end("Proxy error: " + err.message);
+  });
+  proxyReq.end();
 }
 
-const CSP = "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:";
-
 const server = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Service-Worker-Allowed', '/');
-  res.setHeader('Content-Security-Policy', CSP);
+  let urlPath = req.url.split("?")[0];
 
-  let urlPath = req.url.split('?')[0];
-
-  if (urlPath === '/favicon.ico') {
-    res.writeHead(204);
-    res.end();
-    return;
+  // Handle movie proxy requests
+  if (urlPath === "/proxy-movie") {
+    const urlParams = new URLSearchParams(req.url.split("?")[1]);
+    const movieUrl = urlParams.get("url");
+    if (movieUrl) {
+      console.log("Proxying movie:", movieUrl);
+      proxyMovie(movieUrl, req, res);
+      return;
+    } else {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Missing url parameter");
+      return;
+    }
   }
 
-  if (urlPath === '/') urlPath = '/index.html';
+  if (urlPath === "/") urlPath = "/index.html";
+  if (urlPath === "/games") urlPath = "/games.html";
 
-  const filePath = path.join(ROOT, urlPath);
-  if (!filePath.startsWith(ROOT)) { res.writeHead(403); res.end('Forbidden'); return; }
+  const rootAttempt = path.join(__dirname, urlPath);
+  const lithiumAttempt = path.join(__dirname, "lithium-js", urlPath);
 
-  serveFile(filePath, res);
+  function serveFile(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = mimeTypes[ext] || "application/octet-stream";
+    const headers = { "Content-Type": contentType };
+    if (ext === ".html") {
+      headers["X-Frame-Options"] = "ALLOWALL";
+      headers["Content-Security-Policy"] = "frame-ancestors *";
+    }
+    res.writeHead(200, headers);
+    fs.createReadStream(filePath).pipe(res);
+  }
+
+  if (fs.existsSync(rootAttempt) && fs.statSync(rootAttempt).isFile()) {
+    serveFile(rootAttempt);
+  } else if (
+    fs.existsSync(lithiumAttempt) &&
+    fs.statSync(lithiumAttempt).isFile()
+  ) {
+    serveFile(lithiumAttempt);
+  } else {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("Not found: " + urlPath);
+  }
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Ximple running at http://${HOST}:${PORT}/`);
+  console.log(`Server running at http://${HOST}:${PORT}`);
 });
